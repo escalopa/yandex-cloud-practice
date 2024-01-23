@@ -1,0 +1,79 @@
+version: '3'
+
+tasks:
+  build:
+    cmds:
+      - docker build --build-arg APP_FOLDER=./face-detection/ -t cr.yandex/{{.REGISTRY_ID}}/face-detection:latest -f ./Dockerfile . 
+      - docker build --build-arg APP_FOLDER=./face-cut/ -t cr.yandex/{{.REGISTRY_ID}}/face-cut:latest -f ./Dockerfile . 
+      - docker build --build-arg APP_FOLDER=./tg-bot/ -t cr.yandex/{{.REGISTRY_ID}}/tg-bot:latest -f ./Dockerfile . 
+
+  push:
+    cmds:
+      - docker push cr.yandex/{{.REGISTRY_ID}}/face-detection:latest 
+      - docker push cr.yandex/{{.REGISTRY_ID}}/face-cut:latest
+      - docker push cr.yandex/{{.REGISTRY_ID}}/tg-bot:latest 
+
+  init:
+    cmds:
+      - terraform init
+
+  plan:
+    cmds:
+      - terraform plan 
+        -var "access_token={{.IAM_TOKEN}}"
+        -var "user_id={{.USER_ID}}"
+        -var "cloud_id={{.CLOUD_ID}}"
+        -var "folder_id={{.FOLDER_ID}}"
+        -var "registry_id={{.REGISTRY_ID}}"
+
+  validate:
+    cmds:
+      - terraform validate
+
+  apply:
+    cmds:
+      - terraform apply
+        -var "access_token={{.IAM_TOKEN}}"
+        -var "user_id={{.USER_ID}}"
+        -var "folder_id={{.FOLDER_ID}}"
+        -var "cloud_id={{.CLOUD_ID}}"
+        -var "registry_id={{.REGISTRY_ID}}"
+
+      # Remove QUEUE_ID form .env if exists
+      - sed -i '/^QUEUE_ID=/c\' ./../.env
+
+      # Add QUEUE_ID to .env
+      - echo "QUEUE_ID=$(cat ./terraform.tfstate | jq -r '.resources | .[] | select(.name=="queue-task") .instances | .[] | .attributes.arn')" >> ./../.env
+
+  destroy:
+    cmds:
+     - terraform destroy 
+      -var "access_token={{.IAM_TOKEN}}"
+      -var "user_id={{.USER_ID}}"
+      -var "cloud_id={{.CLOUD_ID}}"
+      -var "folder_id={{.FOLDER_ID}}"
+      -var "registry_id={{.REGISTRY_ID}}"
+
+  trigger:
+    cmds:
+      # Create face_detection_trigger on bucket upload
+      - yc serverless trigger create object-storage
+        --name {{.USER_ID}}-face-detection-trigger
+        --bucket-id {{.USER_ID}}-faces
+        --events 'create-object' 
+        --invoke-container-name {{.USER_ID}}-face-detection
+        --invoke-container-service-account-name {{.USER_ID}}-serverless-manager
+        --retry-attempts 1 
+        --retry-interval 10s
+
+      # Create face_cut_trigger on bucket upload
+      - yc serverless trigger create message-queue
+        --name {{.USER_ID}}-face-cut-trigger
+        --queue yrn:yc:ymq:ru-central1:b1gpe83orpai36rd0p30:vvot42-task
+        --queue-service-account-name {{.USER_ID}}-serverless-manager
+        --invoke-container-name {{.USER_ID}}-face-cut
+        --invoke-container-service-account-name {{.USER_ID}}-serverless-manager
+        --batch-size 1
+        --batch-cutoff 10s
+
+

@@ -1,0 +1,44 @@
+version: '3'
+
+includes:
+  service: 
+    taskfile: ./services/Taskfile.yaml
+    dir: ./services
+
+dotenv: ['.env']
+
+tasks:
+  init:
+    cmds:
+      - ./scripts/init.sh
+  
+  plan:
+    cmds:
+      - terraform plan 
+        -var "access_token={{.IAM_TOKEN}}"
+        -var "user_id={{.USER_ID}}"
+        -var "cloud_id={{.CLOUD_ID}}"
+        -var "folder_id={{.FOLDER_ID}}"
+
+  validate:
+    cmds:
+      - terraform validate
+
+  apply:
+    cmds:
+      - terraform apply 
+        -var "access_token={{.IAM_TOKEN}}"
+        -var "user_id={{.USER_ID}}"
+        -var "cloud_id={{.CLOUD_ID}}"
+        -var "folder_id={{.FOLDER_ID}}"
+
+      # Add REGISTRY_ID to .env
+      - REGISTRY_ID=$(yc container registry get {{.USER_ID}}-registry --format=json | jq -r '.id')  &&  echo "REGISTRY_ID=$REGISTRY_ID" >> .env
+      
+  destroy:
+    cmds:
+      - terraform destroy 
+        -var "access_token={{.IAM_TOKEN}}"
+        -var "user_id={{.USER_ID}}"
+        -var "cloud_id={{.CLOUD_ID}}"
+        -var "folder_id={{.FOLDER_ID}}"
