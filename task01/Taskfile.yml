@@ -3,22 +3,24 @@ version: '3'
 includes:
   service: 
     taskfile: ./services/Taskfile.yaml
+    # aliases: [s]
     dir: ./services
 
-dotenv: ['.env']
+vars:
+  MAIN_TFVARS_PATH: "./terraform.tfvars"
 
 tasks:
+  auth:
+    cmds:
+      - sed -i "/^access_token =/c\access_token = \"$(yc iam create-token)\"" {{.MAIN_TFVARS_PATH}}
+
   init:
     cmds:
       - ./scripts/init.sh
   
   plan:
     cmds:
-      - terraform plan 
-        -var "access_token={{.IAM_TOKEN}}"
-        -var "user_id={{.USER_ID}}"
-        -var "cloud_id={{.CLOUD_ID}}"
-        -var "folder_id={{.FOLDER_ID}}"
+      - terraform plan -var-file={{.MAIN_TFVARS_PATH}}
 
   validate:
     cmds:
@@ -26,19 +28,8 @@ tasks:
 
   apply:
     cmds:
-      - terraform apply 
-        -var "access_token={{.IAM_TOKEN}}"
-        -var "user_id={{.USER_ID}}"
-        -var "cloud_id={{.CLOUD_ID}}"
-        -var "folder_id={{.FOLDER_ID}}"
+      - terraform apply -var-file={{.MAIN_TFVARS_PATH}}
 
-      # Add REGISTRY_ID to .env
-      - REGISTRY_ID=$(yc container registry get {{.USER_ID}}-registry --format=json | jq -r '.id')  &&  echo "REGISTRY_ID=$REGISTRY_ID" >> .env
-      
   destroy:
     cmds:
-      - terraform destroy 
-        -var "access_token={{.IAM_TOKEN}}"
-        -var "user_id={{.USER_ID}}"
-        -var "cloud_id={{.CLOUD_ID}}"
-        -var "folder_id={{.FOLDER_ID}}"
+      - terraform destroy -var-file={{.MAIN_TFVARS_PATH}}

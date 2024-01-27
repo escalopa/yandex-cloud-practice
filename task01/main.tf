@@ -30,9 +30,9 @@ provider "yandex" {
   zone      = "ru-central1-a"
 }
 
-# Create `bucket-manager` service account
+# Create `${var.user_id}-bucket-manager` service account
 resource "yandex_iam_service_account" "sa" {
-  name        = "bucket-manager"
+  name        = "${var.user_id}-bucket-manager"
   description = "bucket manager service account"
   folder_id   = var.folder_id
 }
@@ -62,10 +62,4 @@ resource "yandex_storage_bucket" "bucket-faces" {
   access_key = yandex_iam_service_account_static_access_key.sa-static-key.access_key
   secret_key = yandex_iam_service_account_static_access_key.sa-static-key.secret_key
   bucket     = "${var.user_id}-faces"
-}
-
-# Creating containers image registry
-resource "yandex_container_registry" "registry" {
-  name = "${var.user_id}-registry"
-  folder_id = var.folder_id
 }
